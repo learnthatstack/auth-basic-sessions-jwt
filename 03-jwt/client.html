@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JWT Demo Client</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #444;
+      font-size: 18px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      resize: vertical;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button.danger {
+      background: #dc3545;
+    }
+    button.danger:hover {
+      background: #c82333;
+    }
+    button.warning {
+      background: #ffc107;
+      color: #000;
+    }
+    button.warning:hover {
+      background: #e0a800;
+    }
+    button.secondary {
+      background: #6c757d;
+    }
+    button.secondary:hover {
+      background: #545b62;
+    }
+    .token-display {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      margin: 10px 0;
+      border: 1px solid #dee2e6;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .jwt-parts {
+      background: #fff3cd;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      border: 1px solid #ffc107;
+    }
+    .jwt-parts .header { color: #e83e8c; }
+    .jwt-parts .payload { color: #6f42c1; }
+    .jwt-parts .signature { color: #20c997; }
+    .response {
+      background: #e9ecef;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .info {
+      color: #666;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    .highlight {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>JWT Authentication Demo</h1>
+    <p class="subtitle">Test self-contained JWT tokens with signature verification</p>
+
+    <!-- Login Section -->
+    <div class="section">
+      <h2>1. Login (Get JWT)</h2>
+      <input type="text" id="username" placeholder="Username" value="admin">
+      <input type="password" id="password" placeholder="Password" value="secret123">
+      <button onclick="login()">Login</button>
+      <div class="info">Default credentials: admin / secret123 | Watch console for <span class="highlight">no storage needed</span></div>
+      <div id="loginResponse"></div>
+    </div>
+
+    <!-- Token Display -->
+    <div class="section">
+      <h2>Current JWT</h2>
+      <div class="token-display" id="tokenDisplay">No token yet. Login first.</div>
+      <button class="secondary" onclick="copyToken()">Copy Token</button>
+      <button class="secondary" onclick="openJwtIo()">Open in jwt.io</button>
+      <div id="decodedJwt"></div>
+    </div>
+
+    <!-- Protected Resource Section -->
+    <div class="section">
+      <h2>2. Access Protected Resource</h2>
+      <button onclick="getTasks()">Get Tasks</button>
+      <button onclick="getTasksMultiple()">Get Tasks (3x rapidly)</button>
+      <div class="info">Watch server console for <span class="highlight">no database lookup</span> - only signature verification!</div>
+      <div id="tasksResponse"></div>
+    </div>
+
+    <!-- Tampering Demo Section -->
+    <div class="section">
+      <h2>3. Tampering Demo (Signature Verification)</h2>
+      <button class="warning" onclick="tamperToken()">Modify JWT (Change role to "admin")</button>
+      <button class="warning" onclick="testTamperedToken()">Try Tampered Token</button>
+      <div class="info">This demonstrates JWT signature verification - server will reject the modified token</div>
+      <textarea id="tamperedToken" rows="4" placeholder="Tampered token will appear here"></textarea>
+      <div id="tamperResponse"></div>
+    </div>
+
+    <!-- Logout Section -->
+    <div class="section">
+      <h2>4. Logout (Shows Revocation Problem)</h2>
+      <button class="danger" onclick="logout()">Logout</button>
+      <div class="info">Unlike opaque tokens, JWT can't be truly revoked - it remains valid until expiration!</div>
+      <div id="logoutResponse"></div>
+    </div>
+
+    <!-- Test After Logout -->
+    <div class="section">
+      <h2>5. Test Revocation Problem</h2>
+      <button onclick="testAfterLogout()">Use Same JWT After Logout</button>
+      <div class="info">This should <span class="highlight">STILL WORK</span> - demonstrating JWT's revocation limitation</div>
+      <div id="revocationResponse"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentToken = null;
+
+    function showResponse(elementId, data, isError = false) {
+      const element = document.getElementById(elementId);
+      element.className = 'response ' + (isError ? 'error' : 'success');
+      element.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function decodeJwt(token) {
+      try {
+        const parts = token.split('.');
+        const header = JSON.parse(atob(parts[0]));
+        const payload = JSON.parse(atob(parts[1]));
+
+        const decodedDiv = document.getElementById('decodedJwt');
+        decodedDiv.className = 'jwt-parts';
+        decodedDiv.innerHTML = `
+          <div><strong>Header:</strong> <span class="header">${JSON.stringify(header)}</span></div>
+          <div><strong>Payload:</strong> <span class="payload">${JSON.stringify(payload)}</span></div>
+          <div><strong>Signature:</strong> <span class="signature">${parts[2].substring(0, 20)}...</span></div>
+        `;
+      } catch (e) {
+        console.error('Failed to decode JWT:', e);
+      }
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const response = await fetch('http://localhost:3003/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          currentToken = data.access_token;
+          document.getElementById('tokenDisplay').textContent = currentToken;
+          decodeJwt(currentToken);
+          showResponse('loginResponse', data);
+        } else {
+          showResponse('loginResponse', data, true);
+        }
+      } catch (error) {
+        showResponse('loginResponse', { error: error.message }, true);
+      }
+    }
+
+    async function getTasks() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3003/tasks', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('tasksResponse', data, !response.ok);
+      } catch (error) {
+        showResponse('tasksResponse', { error: error.message }, true);
+      }
+    }
+
+    async function getTasksMultiple() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      showResponse('tasksResponse', { message: 'Making 3 requests rapidly...' });
+
+      for (let i = 0; i < 3; i++) {
+        await getTasks();
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    function tamperToken() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      try {
+        const parts = currentToken.split('.');
+        const payload = JSON.parse(atob(parts[1]));
+
+        // Modify the payload (change role to admin)
+        payload.role = 'admin';
+
+        // Re-encode the payload (using Base64URL encoding for JWT)
+        const tamperedPayload = btoa(JSON.stringify(payload))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '');
+
+        // Create tampered token (header + modified payload + original signature)
+        const tamperedToken = parts[0] + '.' + tamperedPayload + '.' + parts[2];
+
+        document.getElementById('tamperedToken').value = tamperedToken;
+        showResponse('tamperResponse', {
+          message: 'JWT modified - role changed from "user" to "admin"',
+          original_role: 'user',
+          modified_role: 'admin',
+          note: 'Signature is now invalid!'
+        });
+      } catch (e) {
+        showResponse('tamperResponse', { error: 'Failed to tamper token: ' + e.message }, true);
+      }
+    }
+
+    async function testTamperedToken() {
+      const tamperedToken = document.getElementById('tamperedToken').value;
+
+      if (!tamperedToken) {
+        alert('Please tamper the token first!');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3003/tasks', {
+          headers: { 'Authorization': `Bearer ${tamperedToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('tamperResponse', {
+          status: response.status,
+          message: response.ok ? 'Tampered token accepted (BAD!)' : 'Tampered token rejected (GOOD!)',
+          response: data
+        }, !response.ok);
+      } catch (error) {
+        showResponse('tamperResponse', { error: error.message }, true);
+      }
+    }
+
+    async function logout() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3003/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('logoutResponse', data, !response.ok);
+      } catch (error) {
+        showResponse('logoutResponse', { error: error.message }, true);
+      }
+    }
+
+    async function testAfterLogout() {
+      if (!currentToken) {
+        alert('Please login and logout first!');
+        return;
+      }
+
+      showResponse('revocationResponse', { message: 'Testing with "logged out" JWT...', note: 'JWT should still work!' });
+
+      try {
+        const response = await fetch('http://localhost:3003/tasks', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('revocationResponse', {
+          status: response.status,
+          message: response.ok ? 'JWT STILL WORKS after logout - this is the revocation problem!' : 'JWT rejected',
+          response: data
+        }, !response.ok);
+      } catch (error) {
+        showResponse('revocationResponse', { error: error.message }, true);
+      }
+    }
+
+    function copyToken() {
+      if (!currentToken) {
+        alert('No token to copy!');
+        return;
+      }
+      navigator.clipboard.writeText(currentToken);
+      alert('Token copied to clipboard!');
+    }
+
+    function openJwtIo() {
+      if (!currentToken) {
+        alert('No token to inspect!');
+        return;
+      }
+      window.open('https://jwt.io/#debugger-io?token=' + currentToken, '_blank');
+    }
+  </script>
+</body>
+</html>

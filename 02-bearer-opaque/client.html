@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bearer Token Demo Client</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #444;
+      font-size: 18px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button.danger {
+      background: #dc3545;
+    }
+    button.danger:hover {
+      background: #c82333;
+    }
+    button.secondary {
+      background: #6c757d;
+    }
+    button.secondary:hover {
+      background: #545b62;
+    }
+    .token-display {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      margin: 10px 0;
+      border: 1px solid #dee2e6;
+    }
+    .response {
+      background: #e9ecef;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .info {
+      color: #666;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Bearer Token Authentication Demo</h1>
+    <p class="subtitle">Test opaque token authentication with instant revocation</p>
+
+    <!-- Login Section -->
+    <div class="section">
+      <h2>1. Login (Get Token)</h2>
+      <input type="text" id="username" placeholder="Username" value="admin">
+      <input type="password" id="password" placeholder="Password" value="secret123">
+      <button onclick="login()">Login</button>
+      <div class="info">Default credentials: admin / secret123</div>
+      <div id="loginResponse"></div>
+    </div>
+
+    <!-- Token Display -->
+    <div class="section">
+      <h2>Current Token</h2>
+      <div class="token-display" id="tokenDisplay">No token yet. Login first.</div>
+      <button class="secondary" onclick="copyToken()">Copy Token</button>
+    </div>
+
+    <!-- Protected Resource Section -->
+    <div class="section">
+      <h2>2. Access Protected Resource</h2>
+      <button onclick="getTasks()">Get Tasks</button>
+      <button onclick="getTasksMultiple()">Get Tasks (3x rapidly)</button>
+      <div class="info">Watch the server console for - DATABASE lookup logs</div>
+      <div id="tasksResponse"></div>
+    </div>
+
+    <!-- Logout Section -->
+    <div class="section">
+      <h2>3. Logout (Revoke Token)</h2>
+      <button class="danger" onclick="logout()">Logout</button>
+      <div class="info">This will delete the token from the database. Try accessing tasks after logout!</div>
+      <div id="logoutResponse"></div>
+    </div>
+
+    <!-- Test After Logout -->
+    <div class="section">
+      <h2>4. Test Revocation</h2>
+      <button onclick="testRevocation()">Try Same Token After Logout</button>
+      <div class="info">This should fail with "Invalid token" - demonstrating instant revocation</div>
+      <div id="revocationResponse"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentToken = null;
+
+    function showResponse(elementId, data, isError = false) {
+      const element = document.getElementById(elementId);
+      element.className = 'response ' + (isError ? 'error' : 'success');
+      element.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const response = await fetch('http://localhost:3002/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          currentToken = data.access_token;
+          document.getElementById('tokenDisplay').textContent = currentToken;
+          showResponse('loginResponse', data);
+        } else {
+          showResponse('loginResponse', data, true);
+        }
+      } catch (error) {
+        showResponse('loginResponse', { error: error.message }, true);
+      }
+    }
+
+    async function getTasks() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3002/tasks', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('tasksResponse', data, !response.ok);
+      } catch (error) {
+        showResponse('tasksResponse', { error: error.message }, true);
+      }
+    }
+
+    async function getTasksMultiple() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      showResponse('tasksResponse', { message: 'Making 3 requests rapidly...' });
+
+      for (let i = 0; i < 3; i++) {
+        await getTasks();
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    async function logout() {
+      if (!currentToken) {
+        alert('Please login first!');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3002/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('logoutResponse', data, !response.ok);
+
+        if (response.ok) {
+          // Keep the token displayed so user can test revocation
+          // currentToken = null;
+          // document.getElementById('tokenDisplay').textContent = 'Token revoked';
+        }
+      } catch (error) {
+        showResponse('logoutResponse', { error: error.message }, true);
+      }
+    }
+
+    async function testRevocation() {
+      if (!currentToken) {
+        alert('Please login and logout first!');
+        return;
+      }
+
+      showResponse('revocationResponse', { message: 'Testing with revoked token...', token: currentToken.substring(0, 20) + '...' });
+
+      try {
+        const response = await fetch('http://localhost:3002/tasks', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        const data = await response.json();
+        showResponse('revocationResponse', {
+          status: response.status,
+          message: response.ok ? 'Token still valid!' : 'Token revoked successfully!',
+          response: data
+        }, !response.ok);
+      } catch (error) {
+        showResponse('revocationResponse', { error: error.message }, true);
+      }
+    }
+
+    function copyToken() {
+      if (!currentToken) {
+        alert('No token to copy!');
+        return;
+      }
+      navigator.clipboard.writeText(currentToken);
+      alert('Token copied to clipboard!');
+    }
+  </script>
+</body>
+</html>
