@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vulnerable Client - localStorage</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    .section {
+      border: 1px solid #ddd;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 5px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 3px;
+    }
+    h2 { color: #333; margin-top: 0; }
+    .warning {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vulnerable Client (localStorage)</h1>
+
+  <div class="warning">
+    <strong>WARNING:</strong> This demonstrates a security vulnerability.
+    Do NOT use localStorage for tokens in production.
+  </div>
+
+  <div class="section">
+    <h2>Login</h2>
+    <input id="username" placeholder="username" value="admin">
+    <input id="password" type="password" placeholder="password" value="secret123">
+    <button onclick="login()">Login</button>
+    <pre id="loginResult"></pre>
+  </div>
+
+  <div class="section">
+    <h2>Get Protected Data</h2>
+    <button onclick="getTasks()">Get Tasks</button>
+    <pre id="tasksResult"></pre>
+  </div>
+
+  <div class="section">
+    <h2>XSS Attack Demo Area</h2>
+    <p>This simulates user-generated content where XSS could be injected.</p>
+    <div id="user-content">
+      <!-- XSS will be injected here -->
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3003';
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const response = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (data.access_token) {
+          // VULNERABLE: Storing token in localStorage
+          localStorage.setItem('token', data.access_token);
+
+          document.getElementById('loginResult').textContent =
+            'Login successful!\n' +
+            'Token stored in localStorage\n' +
+            'Token (first 50 chars): ' + data.access_token.substring(0, 50) + '...';
+        } else {
+          document.getElementById('loginResult').textContent =
+            'Login failed: ' + JSON.stringify(data);
+        }
+      } catch (error) {
+        document.getElementById('loginResult').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function getTasks() {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        document.getElementById('tasksResult').textContent =
+          'No token found. Please login first.';
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/tasks`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json();
+        document.getElementById('tasksResult').textContent =
+          JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('tasksResult').textContent =
+          'Error: ' + error.message;
+      }
+    }
+  </script>
+</body>
+</html>
